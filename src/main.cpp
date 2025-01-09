@@ -90,14 +90,14 @@ void loop() {
     Serial.println("Клиент отключен. Ожидание подключения...");
 
     // Перезапуск BLE, если таймаут истек
-    if (!bleRestarted && millis() - lastConnectAttempt > connectTimeout) {
+   /* if (!bleRestarted && millis() - lastConnectAttempt > connectTimeout) {
       Serial.println("Время подключения истекло. Перезапуск BLE...");
       bleKeyboard.end();     // Завершаем работу BLE
       bleKeyboard.begin();   // Инициализируем BLE заново
       NimBLEDevice::init(deviceName.c_str()); // BLE инициируется один раз
       bleRestarted = true;   // Устанавливаем флаг перезапуска
       lastConnectAttempt = millis(); // Сбрасываем таймер
-    }
+    }*/
   }
 
   delay(10); // Основной цикл
