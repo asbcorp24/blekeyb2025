@@ -1,6 +1,7 @@
 #include <BleKeyboard.h>
 #include <WiFi.h> // Для получения MAC-адреса
 #include <NimBLEDevice.h>
+
 // Переменные для BLE-клавиатуры
 BleKeyboard bleKeyboard;
 
@@ -28,6 +29,11 @@ unsigned long lastConnectAttempt = 0;
 const unsigned long connectTimeout = 10000; // Таймаут 10 секунд
 bool bleRestarted = false;
 
+// Пин для считывания напряжения батареи
+const int batteryPin = 34; // Пин для считывания напряжения батареи
+const float maxVoltage = 4.2; // Максимальное напряжение батареи (например, для литий-ионных батарей)
+const float minVoltage = 3.0; // Минимальное напряжение батареи (например, для литий-ионных батарей)
+
 // Функция для формирования имени устройства
 String generateDeviceName() {
   uint8_t mac[6];
@@ -37,17 +43,17 @@ String generateDeviceName() {
   String deviceName = "exoc-" + String(macStr);
   return deviceName;
 }
-  String deviceName = generateDeviceName();
+
+String deviceName = generateDeviceName();
+
 void setup() {
   Serial.begin(115200);
   Serial.println("Запуск...");
 
   // Генерация имени устройства
-
   Serial.println("Имя устройства: " + deviceName);
 
   // Инициализация BLE-клавиатуры с динамическим именем
-  
   bleKeyboard = BleKeyboard(deviceName.c_str(), "exoc-manufacturer", 100); // Пример имени производителя и уровня заряда
   bleKeyboard.begin();
 
@@ -81,7 +87,6 @@ void loop() {
           // Отправляем соответствующий код клавиши
           bleKeyboard.press(keyCodes[i]);
           bleKeyboard.release(keyCodes[i]);
-          bleKeyboard.
         }
       }
     }
@@ -89,9 +94,23 @@ void loop() {
     lastConnectAttempt = millis(); // Обновляем таймер подключения
   } else {
     Serial.println("Клиент отключен. Ожидание подключения...");
-
-   
   }
 
-  delay(10); // Основной цикл
+  // Считывание и расчет процента заряда батареи
+  int batteryADC = analogRead(batteryPin); // Считываем значение с ADC
+  float voltage = batteryADC * (3.3 / 4095.0); // Преобразуем ADC в напряжение (3.3V - это опорное напряжение для ESP32)
+
+  // Переводим напряжение в процент оставшегося заряда
+  float chargePercent = map(voltage * 1000, minVoltage * 1000, maxVoltage * 1000, 0, 100);
+  chargePercent = constrain(chargePercent, 0, 100); // Ограничиваем значение от 0 до 100%
+
+  // Выводим информацию о батарее
+  Serial.print("Напряжение батареи: ");
+  Serial.print(voltage);
+  Serial.print(" В, ");
+  Serial.print("Оставшийся заряд: ");
+  Serial.print(chargePercent);
+  Serial.println("%");
+
+  delay(1000); // Задержка перед следующим измерением
 }
