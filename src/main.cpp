@@ -81,6 +81,7 @@ void loop() {
           // Отправляем соответствующий код клавиши
           bleKeyboard.press(keyCodes[i]);
           bleKeyboard.release(keyCodes[i]);
+          bleKeyboard.
         }
       }
     }
@@ -89,15 +90,7 @@ void loop() {
   } else {
     Serial.println("Клиент отключен. Ожидание подключения...");
 
-    // Перезапуск BLE, если таймаут истек
-   /* if (!bleRestarted && millis() - lastConnectAttempt > connectTimeout) {
-      Serial.println("Время подключения истекло. Перезапуск BLE...");
-      bleKeyboard.end();     // Завершаем работу BLE
-      bleKeyboard.begin();   // Инициализируем BLE заново
-      NimBLEDevice::init(deviceName.c_str()); // BLE инициируется один раз
-      bleRestarted = true;   // Устанавливаем флаг перезапуска
-      lastConnectAttempt = millis(); // Сбрасываем таймер
-    }*/
+   
   }
 
   delay(10); // Основной цикл
