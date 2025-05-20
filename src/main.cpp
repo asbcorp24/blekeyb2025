@@ -1,10 +1,13 @@
+
+ 
+
 #include <BleKeyboard.h>                // Подключаем библиотеку для эмуляции BLE-клавиатуры  
 #include <BMI160Gen.h>                  // Подключаем библиотеку для работы с акселерометром BMI160/323  
 #include <SPI.h>                        // Подключаем библиотеку для работы с интерфейсом SPI  
 #include <NimBLEDevice.h>              // Подключаем базовую библиотеку NimBLE для BLE-стека  
 #include "freertos/FreeRTOS.h"          // Подключаем заголовок ядра FreeRTOS  
 #include "freertos/task.h"             // Подключаем API для создания и управления задачами FreeRTOS  
-
+#include <Keypad.h>
 // ===== Пины подключения =====  
 #define HSPI_CLK        14             // Номер пина CLK для шины HSPI (датчик BMI323)  
 #define HSPI_SDI        12             // Номер пина MOSI (SDI) для шины HSPI (датчик BMI323)  
@@ -13,19 +16,33 @@
 #define INT1_PIN        26             // Номер пина для входа прерывания INT1 от датчика BMI323  
 #define INT2_PIN        27             // Номер пина для входа прерывания INT2 от датчика BMI323  
 
-#define CHARGE_LED_PIN  22             // Номер пина для светодиода индикатора зарядки  
+//#define CHARGE_LED_PIN  22             // Номер пина для светодиода индикатора зарядки  
 #define POWER_LED_PIN   23             // Номер пина для светодиода индикатора питания  
-#define STATUS_LED_PIN  21             // Номер пина для светодиода индикатора статуса (BLE/ошибка)  
+#define STATUS_LED_PIN  22             // Номер пина для светодиода индикатора статуса (BLE/ошибка)  
 
 #define BATTERY_PIN     34             // Номер пина ADC для измерения напряжения батареи  
 
-#define POWER_BTN_PIN   19             // Номер пина для кнопки питания  
-#define LEFT_BTN_PIN    18             // Номер пина для кнопки «налево»  
-#define RIGHT_BTN_PIN   17             // Номер пина для кнопки «направо»  
-#define SIT_BTN_PIN     16             // Номер пина для кнопки «сесть»  
-#define STAND_BTN_PIN   4              // Номер пина для кнопки «встать/идти»  
-#define READY_BTN_PIN   5              // Номер пина для кнопки «стоп/сброс»  
 
+#define LEFT_BTN_PIN    5             // Номер пина для кнопки «налево»  
+#define RIGHT_BTN_PIN   18             // Номер пина для кнопки «направо»  
+#define SIT_BTN_PIN     19             // Номер пина для кнопки «сесть»  
+#define STAND_BTN_PIN   17              // Номер пина для кнопки «встать/идти»  
+#define READY_BTN_PIN   16              // Номер пина для кнопки «стоп/сброс»  
+#define STD_PIN         4   // дорожка 6
+
+  const byte ROWS = 3; //four rows
+const byte COLS = 3; //four columns
+//define the cymbols on the buttons of the keypads
+char hexaKeys[ROWS][COLS] = {
+  {'A','B','C'},
+  {'D','E','F'},
+  {'G','I','Y'},
+  
+};
+byte rowPins[ROWS] = {LEFT_BTN_PIN,RIGHT_BTN_PIN,SIT_BTN_PIN}; //connect to the row pinouts of the keypad
+byte colPins[COLS] = {STAND_BTN_PIN,READY_BTN_PIN,STD_PIN}; //connect to the column pinouts of the keypad
+//initialize an instance of class NewKeypad
+Keypad customKeypad = Keypad( makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS); 
 // ===== FSM состояний =====  
 enum State { OFF, ON, CHARGING, ERROR };          // Определяем перечисление режимов работы системы  
 volatile State currentState = OFF;                // Объявляем глобальную переменную для текущего состояния, начинаем с OFF  
@@ -44,7 +61,7 @@ struct Blinker {                                  // Определяем стр
   uint32_t intervalMs;                            //  — интервал мигания в миллисекундах (0 = нет мигания)  
   bool state;                                     //  — текущее состояние (вкл/выкл)  
   TickType_t lastToggle;                          //  — время (в тиках FreeRTOS) последнего переключения  
-} chargeBlink{CHARGE_LED_PIN, 0, false, 0},       // Инициализируем экземпляр для индикатора зарядки  
+} //chargeBlink{CHARGE_LED_PIN, 0, false, 0},       // Инициализируем экземпляр для индикатора зарядки  
   powerBlink {POWER_LED_PIN,  0, false, 0},       // Инициализируем экземпляр для индикатора питания  
   statusBlink{STATUS_LED_PIN, 0, false, 0};       // Инициализируем экземпляр для индикатора статуса  
 
@@ -67,16 +84,17 @@ void setup() {
   Serial.begin(115200);                           // Стартуем Serial-порт на скорости 115200 бод  
 
   // Настраиваем кнопки как входы с подтяжкой вверх  
-  pinMode(POWER_BTN_PIN, INPUT_PULLUP);           //  — кнопка питания  
-  pinMode(LEFT_BTN_PIN,  INPUT_PULLUP);           //  — кнопка «налево»  
-  pinMode(RIGHT_BTN_PIN, INPUT_PULLUP);           //  — кнопка «направо»  
-  pinMode(SIT_BTN_PIN,   INPUT_PULLUP);           //  — кнопка «сесть»  
-  pinMode(STAND_BTN_PIN, INPUT_PULLUP);           //  — кнопка «встать/идти»  
-  pinMode(READY_BTN_PIN, INPUT_PULLUP);           //  — кнопка «стоп/сброс»  
+ // pinMode(POWER_BTN_PIN, INPUT_PULLUP);           //  — кнопка питания  
+ /* pinMode(LEFT_BTN_PIN,  INPUT);           //  — кнопка «налево»  
+  pinMode(RIGHT_BTN_PIN, INPUT);           //  — кнопка «направо»  
+  pinMode(SIT_BTN_PIN,   INPUT);           //  — кнопка «сесть»  
+  pinMode(STAND_BTN_PIN, INPUT);           //  — кнопка «встать/идти»  
+  pinMode(READY_BTN_PIN, INPUT);           //  — кнопка «стоп/сброс»  */
 
   // Настраиваем пины светодиодов как выходы  
-  pinMode(CHARGE_LED_PIN, OUTPUT);                //  — индикатор зарядки  
-  pinMode(POWER_LED_PIN,  OUTPUT);                //  — индикатор питания  
+  //pinMode(CHARGE_LED_PIN, OUTPUT);                //  — индикатор зарядки  
+   pinMode(POWER_LED_PIN,  OUTPUT);                //  — индикатор питания  
+   // digitalWrite(POWER_LED_PIN, LOW);
   pinMode(STATUS_LED_PIN, OUTPUT);                //  — индикатор статуса  
 
   // Инициализируем шину SPI под HSPI (для BMI323)  
@@ -84,23 +102,26 @@ void setup() {
 
   // Конфигурируем АЦП для считывания напряжения батареи  
   analogReadResolution(12);                       //  — 12-битное разрешение  
-  analogSetPinAttenuation(BATTERY_PIN, ADC_11db); //  — аттенюация, чтобы измерять до ~3.3 В  
+  analogSetPinAttenuation(BATTERY_PIN, ADC_ATTENDB_MAX); //  — аттенюация, чтобы измерять до ~3.3 В  
 
-  // Пытаемся инициализировать BMI323 по SPI  
-  if (!bmi.begin(HSPI_CS, INT1_PIN)) {        // SPI-CS и пин прерывания
+   // Пытаемся инициализировать BMI323 по SPI  
+/*   if (!bmi.begin(HSPI_CS, INT1_PIN)) {        // SPI-CS и пин прерывания
     Serial.println("Ошибка инициализации BMI323");
     currentState = ERROR;
   } else {
     bmi.setAccelerometerRange(BMI160_ACCEL_RANGE_2G); // диапазон ±2g
     bmi.setAccelerometerRate(BMI160_ACCEL_RATE_100HZ);// частота 100 Гц
-  }
+  }  */
   // Создаём задачи FreeRTOS, закрепляя их на ядрах ESP32  
-  xTaskCreatePinnedToCore(Task_PowerButton, "PowerBtn", 2048, NULL, 2, NULL, 1);  
+ // xTaskCreatePinnedToCore(Task_PowerButton, "PowerBtn", 2048, NULL, 2, NULL, 1);  
+   currentState = ON;                       //  — включаем устройство  
+        powerBlink.intervalMs = 0;               //  — светодиод питания горит постоянно  
+      digitalWrite(POWER_LED_PIN,HIGH); //вернуть
   xTaskCreatePinnedToCore(Task_Battery,     "Battery",  2048, NULL, 1, NULL, 1);  
   xTaskCreatePinnedToCore(Task_LEDs,        "LEDs",     2048, NULL, 1, NULL, 1);  
   xTaskCreatePinnedToCore(Task_BLE,         "BLE",      4096, NULL, 2, NULL, 0);  
   xTaskCreatePinnedToCore(Task_Controls,    "Controls", 2048, NULL, 1, NULL, 1);  
-  xTaskCreatePinnedToCore(Task_IMU,         "IMU",      4096, NULL, 2, NULL, 1);  
+ // xTaskCreatePinnedToCore(Task_IMU,         "IMU",      4096, NULL, 2, NULL, 1);  
 }  
 
 void loop() {  
@@ -108,7 +129,7 @@ void loop() {
 }  
 
 // ===== Задача: кнопка питания =====  
-void Task_PowerButton(void* pv) {  
+/* void Task_PowerButton(void* pv) {  
   const TickType_t debounce = pdMS_TO_TICKS(50); // Устанавливаем время «дребезга» в 50 мс  
   bool lastState = HIGH;                         // Переменная для хранения предыдущего состояния кнопки  
   TickType_t lastTime = xTaskGetTickCount();     // Время последнего изменения  
@@ -132,19 +153,26 @@ void Task_PowerButton(void* pv) {
     lastState = cur;                             // Сохраняем текущее состояние  
     vTaskDelay(pdMS_TO_TICKS(10));               // Ждём 10 мс, чтобы не перегружать ЦП  
   }  
-}  
+}   */
 
 // ===== Задача: измерение батареи =====  
 void Task_Battery(void* pv) {  
-  const TickType_t interval = pdMS_TO_TICKS(5000);// Интервал опроса 5 сек  
+  const TickType_t interval = pdMS_TO_TICKS(25000);// Интервал опроса 5 сек  
 
   for (;;) {  
-    int raw = analogRead(BATTERY_PIN);            // Читаем значение АЦП  
-    float v = raw * (3.3f/4095.0f) * 2.0f;         // Переводим в напряжение (с учётом делителя)  
-    float pct = (v*1000 - 3000) * 100.0f / 1200.0f;// Переводим диапазон 3.0–4.2 В → 0–100%  
+    int raw = analogRead(BATTERY_PIN);        
+       // Читаем значение АЦП  
+    float v = raw * (3.3f/4095.0f);         // Переводим в напряжение (с учётом делителя)  
+      Serial.println(v);// Выводим значение в консоль 
+   
+    float pct = v/4.2*100;// Переводим диапазон 3.0–4.2 В → 0–100%  
     batteryPct = constrain(pct, 0.0f, 100.0f);    // Ограничиваем результат 0–100%  
 
-    if (bleKeyboard.isConnected())                // Если BLE-клиент подключён  
+    if (bleKeyboard.isConnected())
+    if(batteryPct>80){ bleKeyboard.press(KEY_F6);}
+    else if(batteryPct>60){ bleKeyboard.press(KEY_F7);}
+    else if (batteryPct>40){ bleKeyboard.press(KEY_F8);}
+    else if(batteryPct>20){ bleKeyboard.press(KEY_F9);}              // Если BLE-клиент подключён  
       bleKeyboard.setBatteryLevel((int)batteryPct);//  — передаём уровень заряда  
 
     Serial.printf("Battery: %.1f%%\n", batteryPct);// Выводим значение в консоль  
@@ -157,21 +185,21 @@ void Task_LEDs(void* pv) {
   for (;;) {  
     TickType_t now = xTaskGetTickCount();         // Текущее время в тиках  
 
-    // Настраиваем мигание индикатора зарядки  
+   /*  // Настраиваем мигание индикатора зарядки  
     if (currentState == CHARGING)                 // Если идёт заряд  
       chargeBlink.intervalMs = (batteryPct >= 100.0f ? 0 : 500);  //  — 500 мс, пока не 100%  
     else {                                        // Иначе  
       chargeBlink.intervalMs = 0;                 //  — гасим индикатор  
       digitalWrite(CHARGE_LED_PIN, LOW);  
-    }  
+    }   */
 
     // Настраиваем мигание индикатора питания  
-    if (currentState == ON) {  
+   if (currentState == ON) {  
       if      (batteryPct < 20.0f) powerBlink.intervalMs = 100;   //  — критически низкий заряд  
       else if (batteryPct < 50.0f) powerBlink.intervalMs = 300;   //  — низкий заряд  
       else                          powerBlink.intervalMs = 0,   //  — нормальный заряд  
                                     digitalWrite(POWER_LED_PIN, HIGH);  
-    }  
+    }    
 
     // Настраиваем индикатор статуса BLE/ошибки  
     if (currentState == ERROR)                   // Если в состоянии ошибки  
@@ -192,7 +220,7 @@ void Task_LEDs(void* pv) {
       }  
     };  
 
-    updateBlink(chargeBlink);                    // Обновляем индикатор зарядки  
+   // updateBlink(chargeBlink);                    // Обновляем индикатор зарядки  
     updateBlink(powerBlink);                     // Обновляем индикатор питания  
     updateBlink(statusBlink);                    // Обновляем индикатор статуса  
 
@@ -202,9 +230,12 @@ void Task_LEDs(void* pv) {
 
 // ===== Задача: поддержка BLE =====  
 void Task_BLE(void* pv) {  
-  bleKeyboard.begin();                            // Инициализируем BLE-клавиатуру  
+  bleKeyboard.begin();   
+   Serial.println("стартуем BLE");                               // Инициализируем BLE-клавиатуру  
   for (;;) {  
-    if (!bleKeyboard.isConnected()) {             // Если клиент отключился  
+     Serial.println("пинг");      
+    if (!bleKeyboard.isConnected()) {    
+      Serial.println("стартуем BLE");           // Если клиент отключился  
       bleKeyboard.end();                          //  — завершаем сервис  
       bleKeyboard.begin();                        //  — перезапускаем сервис  
     }  
@@ -212,36 +243,103 @@ void Task_BLE(void* pv) {
   }  
 }  
 
-// ===== Задача: обработка управляющих кнопок =====  
-void Task_Controls(void* pv) {  
-  struct Btn { uint8_t pin; uint16_t key; };      // Структура «пин → код клавиши»  
-  const Btn actions[] = {                         // Массив действий  
-    {LEFT_BTN_PIN,  KEY_LEFT_ARROW},              //  — влево  
-    {RIGHT_BTN_PIN, KEY_RIGHT_ARROW},             //  — вправо  
-    {SIT_BTN_PIN,   's'},                         //  — сесть  
-    {STAND_BTN_PIN, 'w'},                         //  — встать/идти  
-    {READY_BTN_PIN, 'r'}                          //  — стоп/сброс  
-  };  
-  const TickType_t debounce = pdMS_TO_TICKS(50);  // Дебаунс для кнопок 50 мс  
-  TickType_t lastTime[5] = {};                    // Массив времён последнего изменения  
-  bool lastState[5] = {HIGH, HIGH, HIGH, HIGH, HIGH}; // Массив предыдущих состояний  
 
-  for (;;) {  
-    if (currentState == ON && bleKeyboard.isConnected()) { // Только если включено и BLE подключено  
-      for (int i = 0; i < 5; i++) {  
-        bool cur = digitalRead(actions[i].pin);  // Считываем состояние кнопки  
-        if (cur != lastState[i])                 // Если изменилось  
-          lastTime[i] = xTaskGetTickCount();     //  — сбрасываем таймер  
-        if (xTaskGetTickCount() - lastTime[i] > debounce && cur == LOW && lastState[i] == HIGH) {  
-          bleKeyboard.press(actions[i].key);     //  — нажимаем виртуальную клавишу  
-          bleKeyboard.release(actions[i].key);   //  — отпускаем её  
-        }  
-        lastState[i] = cur;                      // Обновляем предыдущее состояние  
-      }  
-    }  
-    vTaskDelay(pdMS_TO_TICKS(10));               // Ждём 10 мс между итерациями  
-  }  
-}  
+void Task_Controls(void* pv) {
+ for (;;) {
+    // чтение из Keypad
+    char customKey = customKeypad.getKey();
+
+    // если нажато что-то, отличное от NO_KEY
+    if (customKey != NO_KEY) {
+      // выведем в консоль букву-код
+      Serial.printf("Keypad: %c\n", customKey);
+
+      // в зависимости от символа шлём нужную F-клавишу
+      switch (customKey) {
+        case 'Y': bleKeyboard.press(KEY_F1);Serial.println("F1"); break;  // 1–4
+        case 'I': bleKeyboard.press(KEY_F2);Serial.println("F2"); break;  // 2–5
+        case 'E': bleKeyboard.press(KEY_F3);Serial.println("F3"); break;  // 2–6
+        case 'B': bleKeyboard.press(KEY_F4);Serial.println("F4"); break;  // 2–4
+        case 'G': bleKeyboard.press(KEY_F5);Serial.println("F5"); break;  // 3–4
+        default:
+          // если попало что-то лишнее — игнорируем
+          break;
+      }
+    }
+
+    // даём другим задачам пожить, 10 мс
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+
+/* void Task_Controls2(void* pv) {
+  // Номера GPIO, к которым подключены дорожки клавиатуры
+ 
+
+  // Каждая кнопка — это пара (i, j) дорожек, плюс код клавиши
+  struct KeyMap { uint8_t a, b; uint16_t key; };
+  const KeyMap keys[5] = {
+    { 1, 4, KEY_F1 },  // дорожки 1–4 → F1
+    { 2, 5, KEY_F2 },  // дорожки 2–5 → F2
+    { 2, 6, KEY_F3 },  // дорожки 2–6 → F3
+    { 2, 4, KEY_F4 },  // дорожки 2–4 → F4
+    { 3, 4, KEY_F5 }   // дорожки 3–4 → F5
+  };
+
+  const TickType_t debounce = pdMS_TO_TICKS(50);
+  TickType_t lastTime[5] = {0};
+  bool lastState[5]  = {false, false, false, false, false};
+
+  // Инициализация: все дорожки — входы с подтяжкой
+  for (uint8_t t = 0; t < 6; ++t) {
+    pinMode(trackPins[t], INPUT_PULLUP);
+  }
+
+  for (;;) {
+    if (currentState == ON && bleKeyboard.isConnected()) {
+      // Для каждой дорожки i делаем output LOW, остальные — input pullup
+      for (uint8_t i = 0; i < 6; ++i) {
+        // 1) Опустить линию i
+        pinMode(trackPins[i], OUTPUT);
+        digitalWrite(trackPins[i], LOW);
+        // 2) Все остальные — входы с подтяжкой
+        for (uint8_t j = 0; j < 6; ++j) {
+          if (j != i) {
+            pinMode(trackPins[j], INPUT_PULLUP);
+          }
+        }
+        // 3) Смотрим, какие из остальных подтянулись вниз
+        for (uint8_t k = 0; k < 5; ++k) {
+          uint8_t a = keys[k].a - 1;
+          uint8_t b = keys[k].b - 1;
+          bool pressed = false;
+          // кнопка k замыкает дорожки a и b
+          if ((a == i && digitalRead(trackPins[b]) == LOW) ||
+              (b == i && digitalRead(trackPins[a]) == LOW)) {
+            pressed = true;
+          }
+          // Дребезг
+          if (pressed != lastState[k]) {
+            lastTime[k] = xTaskGetTickCount();
+          }
+          if (xTaskGetTickCount() - lastTime[k] > debounce) {
+            if (pressed && !lastState[k]) {
+              // подтверждённое нажатие
+              Serial.println( keys[k].key) ;
+              bleKeyboard.press(keys[k].key);
+              bleKeyboard.release(keys[k].key);
+            }
+            lastState[k] = pressed;
+          }
+        }
+        // 4) Сброс: делаем i обратно входом
+        pinMode(trackPins[i], INPUT_PULLUP);
+      }
+    }
+    vTaskDelay(pdMS_TO_TICKS(10)); // пауза 10 мс
+  }
+}
+ */
 
 // ===== Задача: обнаружение «удар + свободное падение» =====  
 void Task_IMU(void* pv) {  
@@ -285,4 +383,4 @@ void Task_IMU(void* pv) {
 
     vTaskDelay(pdMS_TO_TICKS(20));                    // Пауза ~20 мс (~50 Гц) перед следующим чтением  
   }  
-}  
+}
