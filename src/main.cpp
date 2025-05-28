@@ -4,7 +4,7 @@
 #include <BleKeyboard.h>                // Подключаем библиотеку для эмуляции BLE-клавиатуры  
 #include <BMI160Gen.h>                  // Подключаем библиотеку для работы с акселерометром BMI160/323  
 #include <SPI.h>                        // Подключаем библиотеку для работы с интерфейсом SPI  
-#include <NimBLEDevice.h>              // Подключаем базовую библиотеку NimBLE для BLE-стека  
+//#include <NimBLEDevice.h>              // Подключаем базовую библиотеку NimBLE для BLE-стека  
 #include "freertos/FreeRTOS.h"          // Подключаем заголовок ядра FreeRTOS  
 #include "freertos/task.h"             // Подключаем API для создания и управления задачами FreeRTOS  
 #include <Keypad.h>
@@ -117,10 +117,10 @@ void setup() {
    currentState = ON;                       //  — включаем устройство  
         powerBlink.intervalMs = 0;               //  — светодиод питания горит постоянно  
       digitalWrite(POWER_LED_PIN,HIGH); //вернуть
-  xTaskCreatePinnedToCore(Task_Battery,     "Battery",  2048, NULL, 1, NULL, 1);  
+  xTaskCreatePinnedToCore(Task_Battery,     "Battery",  4096, NULL, 1, NULL, 1);  
   xTaskCreatePinnedToCore(Task_LEDs,        "LEDs",     2048, NULL, 1, NULL, 1);  
   xTaskCreatePinnedToCore(Task_BLE,         "BLE",      4096, NULL, 2, NULL, 0);  
-  xTaskCreatePinnedToCore(Task_Controls,    "Controls", 2048, NULL, 1, NULL, 1);  
+  xTaskCreatePinnedToCore(Task_Controls,    "Controls", 4096, NULL, 1, NULL, 1);  
  // xTaskCreatePinnedToCore(Task_IMU,         "IMU",      4096, NULL, 2, NULL, 1);  
 }  
 
@@ -157,6 +157,7 @@ void loop() {
 
 // ===== Задача: измерение батареи =====  
 void Task_Battery(void* pv) {  
+  
   const TickType_t interval = pdMS_TO_TICKS(25000);// Интервал опроса 5 сек  
 
   for (;;) {  
@@ -169,10 +170,10 @@ void Task_Battery(void* pv) {
     batteryPct = constrain(pct, 0.0f, 100.0f);    // Ограничиваем результат 0–100%  
 
     if (bleKeyboard.isConnected())
-    if(batteryPct>80){ bleKeyboard.press(KEY_F6);}
-    else if(batteryPct>60){ bleKeyboard.press(KEY_F7);}
-    else if (batteryPct>40){ bleKeyboard.press(KEY_F8);}
-    else if(batteryPct>20){ bleKeyboard.press(KEY_F9);}              // Если BLE-клиент подключён  
+    if(batteryPct>80){ bleKeyboard.write(KEY_F6);}
+    else if(batteryPct>60){ bleKeyboard.write(KEY_F7);}
+    else if (batteryPct>40){ bleKeyboard.write(KEY_F8);}
+    else if(batteryPct>20){ bleKeyboard.write(KEY_F9);}              // Если BLE-клиент подключён  
       bleKeyboard.setBatteryLevel((int)batteryPct);//  — передаём уровень заряда  
 
     Serial.printf("Battery: %.1f%%\n", batteryPct);// Выводим значение в консоль  
@@ -234,10 +235,15 @@ void Task_BLE(void* pv) {
    Serial.println("стартуем BLE");                               // Инициализируем BLE-клавиатуру  
   for (;;) {  
      Serial.println("пинг");      
-    if (!bleKeyboard.isConnected()) {    
+   /* if (!bleKeyboard.isConnected()) {    
       Serial.println("стартуем BLE");           // Если клиент отключился  
       bleKeyboard.end();                          //  — завершаем сервис  
       bleKeyboard.begin();                        //  — перезапускаем сервис  
+    }*/
+     if (!bleKeyboard.isConnected()) {
+      Serial.println("ожидаем клиента...");
+    } else {
+      Serial.println("клиент подключен");
     }  
     vTaskDelay(pdMS_TO_TICKS(10000));             // Пауза 10 сек перед проверкой снова  
   }  
@@ -256,11 +262,12 @@ void Task_Controls(void* pv) {
 
       // в зависимости от символа шлём нужную F-клавишу
       switch (customKey) {
-        case 'Y': bleKeyboard.press(KEY_F1);Serial.println("F1"); break;  // 1–4
-        case 'I': bleKeyboard.press(KEY_F2);Serial.println("F2"); break;  // 2–5
-        case 'E': bleKeyboard.press(KEY_F3);Serial.println("F3"); break;  // 2–6
-        case 'B': bleKeyboard.press(KEY_F4);Serial.println("F4"); break;  // 2–4
-        case 'G': bleKeyboard.press(KEY_F5);Serial.println("F5"); break;  // 3–4
+        //case 'Y': bleKeyboard.press(KEY_F1);Serial.println("F1"); break;  // 1–4
+        case 'Y': bleKeyboard.write(KEY_F1);Serial.println("F1"); break;  // 1–4
+        case 'I': bleKeyboard.write(KEY_F2);Serial.println("F2"); break;  // 2–5
+        case 'E': bleKeyboard.write(KEY_F3);Serial.println("F3"); break;  // 2–6
+        case 'B': bleKeyboard.write(KEY_F4);Serial.println("F4"); break;  // 2–4
+        case 'G': bleKeyboard.write(KEY_F5);Serial.println("F5"); break;  // 3–4
         default:
           // если попало что-то лишнее — игнорируем
           break;
@@ -373,7 +380,7 @@ void Task_IMU(void* pv) {
           Serial.println("Свободное падение подтверждено, отправляю STOP");  
           if (bleKeyboard.isConnected())  
                         //      — если BLE подключено  
-            bleKeyboard.press(KEY_F11);                     //        отправляем команду стоп (‘r’)  
+            bleKeyboard.write(KEY_F11);                     //        отправляем команду стоп (‘r’)  
           impactDetected = false;                     //      — сбрасываем детектор для нового цикла  
         }  
       } else {                                        //  — если ускорение снова превысило FREEFALL_THRESHOLD_G  
