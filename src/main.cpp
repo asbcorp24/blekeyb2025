@@ -264,6 +264,7 @@ void Task_Controls(void* pv) {
       switch (customKey) {
         //case 'Y': bleKeyboard.press(KEY_F1);Serial.println("F1"); break;  // 1–4
         case 'Y': bleKeyboard.write(KEY_F1);Serial.println("F1"); break;  // 1–4
+      //  case 'Y': bleKeyboard.println("12345");Serial.println("12345"); break;  // 1–4
         case 'I': bleKeyboard.write(KEY_F2);Serial.println("F2"); break;  // 2–5
         case 'E': bleKeyboard.write(KEY_F3);Serial.println("F3"); break;  // 2–6
         case 'B': bleKeyboard.write(KEY_F4);Serial.println("F4"); break;  // 2–4
